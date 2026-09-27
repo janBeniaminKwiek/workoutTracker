@@ -160,6 +160,12 @@
 
     <div id="progressPage" class="tabpage">
       <section class="card chartCard">
+        <div class="chartTitle">Kroppsvekt</div>
+        <div class="chartMeta" id="weightMeta">Utvikling over tid</div>
+        <div class="chartWrap" id="weightChart"></div>
+      </section>
+
+      <section class="card chartCard">
         <div class="chartTitle">Benkpress</div>
         <div class="chartMeta" id="benchMeta">Utvikling over tid</div>
         <div class="chartWrap" id="benchChart"></div>
@@ -175,6 +181,20 @@
         <div class="chartTitle">Knebøy</div>
         <div class="chartMeta" id="squatMeta">Utvikling over tid</div>
         <div class="chartWrap" id="squatChart"></div>
+      </section>
+
+      <section class="card">
+        <div class="label">Sikkerhetskopi</div>
+        <div style="font-size:19px;font-weight:800;margin:8px 0 6px">Backup av alle data</div>
+        <div class="status" style="margin-bottom:14px">
+          Eksporterer vekt, treningshistorikk, streak-grunnlag og alle registrerte øvelsesverdier.
+        </div>
+        <div class="row">
+          <button id="exportBackup">Eksporter backup</button>
+          <button id="importBackup" class="secondary">Importer backup</button>
+          <input id="backupFile" type="file" accept=".json,application/json" style="display:none" />
+        </div>
+        <div class="status" id="backupStatus" style="margin-top:12px"></div>
       </section>
     </div>
 
@@ -271,6 +291,13 @@ function calculateStreaks(data){
 }
 
 
+function getWeightSeries(data){
+  return Object.entries(data.days)
+    .filter(([k,v]) => v.weight !== null && v.weight !== "" && !isNaN(Number(v.weight)))
+    .map(([k,v]) => ({date:k, value:Number(v.weight)}))
+    .sort((a,b)=>a.date.localeCompare(b.date));
+}
+
 function getStrengthSeries(data, dow){
   return Object.entries(data.days)
     .filter(([k,v]) => parseKey(k).getDay() === dow && v.exerciseValue !== null && v.exerciseValue !== "" && !isNaN(Number(v.exerciseValue)))
@@ -328,6 +355,7 @@ function renderLineChart(containerId, metaId, points, unit){
 }
 
 function renderProgress(data){
+  renderLineChart("weightChart","weightMeta",getWeightSeries(data),"kg");
   renderLineChart("benchChart","benchMeta",getStrengthSeries(data,1),"kg");
   renderLineChart("deadliftChart","deadliftMeta",getStrengthSeries(data,3),"kg");
   renderLineChart("squatChart","squatMeta",getStrengthSeries(data,5),"kg");
@@ -445,6 +473,62 @@ document.getElementById("toggleDone").addEventListener("click",()=>{
   render();
 });
 
+
+
+function makeBackup(){
+  const data=loadData();
+  return {
+    app:"Min trening",
+    version:4,
+    exportedAt:new Date().toISOString(),
+    data:data
+  };
+}
+
+document.getElementById("exportBackup").addEventListener("click",()=>{
+  const backup=makeBackup();
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  const d=new Date();
+  const stamp=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  a.href=url;
+  a.download=`trening-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  document.getElementById("backupStatus").textContent=`Backup laget ${d.toLocaleDateString("nb-NO")}. Lagre filen i Filer/iCloud Drive.`;
+});
+
+document.getElementById("importBackup").addEventListener("click",()=>{
+  document.getElementById("backupFile").click();
+});
+
+document.getElementById("backupFile").addEventListener("change",async(e)=>{
+  const file=e.target.files && e.target.files[0];
+  if(!file) return;
+  const status=document.getElementById("backupStatus");
+  try{
+    const raw=await file.text();
+    const parsed=JSON.parse(raw);
+    const restored=parsed && parsed.data && parsed.data.days ? parsed.data : parsed;
+    if(!restored || typeof restored!=="object" || !restored.days || typeof restored.days!=="object"){
+      throw new Error("Ugyldig backup");
+    }
+    const count=Object.keys(restored.days).length;
+    if(!confirm(`Importere backup med ${count} registrerte dager? Dette erstatter dataene som ligger i appen nå.`)){
+      e.target.value="";
+      return;
+    }
+    saveData(restored);
+    render();
+    status.textContent=`Backup importert. ${count} registrerte dager er gjenopprettet.`;
+  }catch(err){
+    status.textContent="Kunne ikke importere filen. Kontroller at dette er en backup fra treningsappen.";
+  }
+  e.target.value="";
+});
 
 document.querySelectorAll(".tabbtn").forEach(btn=>{
   btn.addEventListener("click",()=>{
