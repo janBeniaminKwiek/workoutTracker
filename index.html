@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Trening" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <title>Min trening</title>
+  <style>
+    :root{
+      --bg:#0b1020; --card:#121a2e; --muted:#94a3b8; --text:#f8fafc;
+      --accent:#34d399; --accent2:#60a5fa; --danger:#fb7185; --line:#243047;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      background:linear-gradient(180deg,#0b1020,#111827 55%,#0b1020);
+      color:var(--text); min-height:100vh;
+    }
+    .wrap{max-width:720px;margin:0 auto;padding:24px 16px 42px}
+    h1{font-size:30px;margin:4px 0 6px}
+    .sub{color:var(--muted);margin-bottom:18px}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    .card{
+      background:rgba(18,26,46,.96); border:1px solid var(--line); border-radius:20px;
+      padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.22);
+    }
+    .today{border-color:#365a54}
+    .label{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .workout{font-size:25px;font-weight:750;margin:8px 0 16px;line-height:1.2}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    input[type="number"]{
+      width:150px; font-size:20px; border-radius:14px; border:1px solid var(--line);
+      background:#0b1222; color:var(--text); padding:12px 13px; outline:none;
+    }
+    input[type="number"]:focus{border-color:var(--accent2)}
+    button{
+      border:0; border-radius:14px; padding:12px 14px; font-size:16px; font-weight:700;
+      background:var(--accent); color:#052e24; cursor:pointer;
+    }
+    button.secondary{background:#1f2a44;color:#dbeafe;border:1px solid var(--line)}
+    button.done{background:#163d31;color:#a7f3d0;border:1px solid #2f6d58}
+    .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .stat{background:#0b1222;border:1px solid var(--line);border-radius:16px;padding:14px}
+    .stat .n{font-size:28px;font-weight:800;margin-top:4px}
+    .week{display:grid;gap:8px;margin-top:10px}
+    .day{
+      display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);
+    }
+    .day:last-child{border-bottom:0}
+    .day b{min-width:84px}
+    .status{font-size:13px;color:var(--muted)}
+    .history{display:grid;gap:8px;max-height:340px;overflow:auto}
+    .item{
+      display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;
+      padding:10px 0;border-bottom:1px solid var(--line)
+    }
+    .item:last-child{border-bottom:0}
+    .pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .ok{background:#153b30;color:#a7f3d0}
+    .rest{background:#2a3144;color:#cbd5e1}
+    .empty{color:var(--muted)}
+    .foot{color:var(--muted);font-size:12px;margin-top:16px;line-height:1.4}
+    @media (min-width:650px){.grid.two{grid-template-columns:1.2fr .8fr}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Min trening</h1>
+    <div class="sub" id="dateText"></div>
+
+    <div class="grid two">
+      <section class="card today">
+        <div class="label">Dagens økt</div>
+        <div class="workout" id="todayWorkout"></div>
+
+        <div class="row" style="margin-bottom:12px">
+          <input id="weightInput" type="number" min="30" max="300" step="0.1" inputmode="decimal" placeholder="Vekt kg" />
+          <button id="saveWeight">Lagre vekt</button>
+        </div>
+
+        <div class="row">
+          <button id="toggleDone" class="secondary">✓ Marker trening som gjort</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="label">Streak</div>
+        <div class="stats" style="margin-top:10px">
+          <div class="stat">
+            <div class="label">Nåværende</div>
+            <div class="n" id="currentStreak">0</div>
+            <div class="status">treningsøkter på rad</div>
+          </div>
+          <div class="stat">
+            <div class="label">Beste</div>
+            <div class="n" id="bestStreak">0</div>
+            <div class="status">treningsøkter på rad</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:14px">
+      <div class="label">Ukeplan</div>
+      <div class="week" id="weekPlan"></div>
+    </section>
+
+    <section class="card" style="margin-top:14px">
+      <div class="label">Historikk</div>
+      <div class="history" id="history" style="margin-top:8px"></div>
+    </section>
+
+    <div class="foot">
+      Alt lagres bare lokalt på denne enheten i nettleseren. Ingen konto og ingen opplasting.
+    </div>
+  </main>
+
+<script>
+const PLAN = {
+  1: "Bryst / triceps",
+  2: "Kondisjon – intervaller",
+  3: "Rygg / biceps",
+  4: "Kondisjon",
+  5: "Bein",
+  6: "Fri",
+  0: "Skuldre / nakke + kondisjon (lang)"
+};
+const DAY_NAMES = ["Søndag","Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag"];
+const KEY = "jan-training-app-v1";
+
+function loadData(){
+  try { return JSON.parse(localStorage.getItem(KEY)) || {days:{}}; }
+  catch { return {days:{}}; }
+}
+function saveData(data){ localStorage.setItem(KEY, JSON.stringify(data)); }
+function dateKey(d=new Date()){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function fmtDate(d){
+  return d.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+}
+function parseKey(k){
+  const [y,m,d]=k.split("-").map(Number);
+  return new Date(y,m-1,d);
+}
+function ensureToday(data){
+  const k=dateKey(), dow=new Date().getDay();
+  if(!data.days[k]) data.days[k] = {workoutDone:false, weight:null, workout:PLAN[dow], dayOfWeek:dow};
+  return data.days[k];
+}
+function isTrainingDay(d){ return d.getDay() !== 6; }
+
+function calculateStreaks(data){
+  const doneKeys = Object.entries(data.days)
+    .filter(([k,v]) => v.workoutDone && parseKey(k).getDay() !== 6)
+    .map(([k]) => k)
+    .sort();
+
+  if(doneKeys.length===0) return {current:0,best:0};
+
+  let best=1, run=1;
+  for(let i=1;i<doneKeys.length;i++){
+    let a=parseKey(doneKeys[i-1]), b=parseKey(doneKeys[i]);
+    let cursor=new Date(a); cursor.setDate(cursor.getDate()+1);
+    while(cursor.getDay()===6) cursor.setDate(cursor.getDate()+1);
+    if(dateKey(cursor)===dateKey(b)) run++;
+    else run=1;
+    if(run>best) best=run;
+  }
+
+  let current=0;
+  let cursor=new Date();
+  if(cursor.getDay()===6) cursor.setDate(cursor.getDate()-1);
+
+  while(true){
+    const k=dateKey(cursor);
+    const rec=data.days[k];
+    if(rec && rec.workoutDone){ current++; }
+    else{
+      const todayK=dateKey(new Date());
+      if(k===todayK){
+        cursor.setDate(cursor.getDate()-1);
+        if(cursor.getDay()===6) cursor.setDate(cursor.getDate()-1);
+        continue;
+      }
+      break;
+    }
+    cursor.setDate(cursor.getDate()-1);
+    if(cursor.getDay()===6) cursor.setDate(cursor.getDate()-1);
+  }
+
+  return {current,best};
+}
+
+function render(){
+  const data=loadData();
+  const today=ensureToday(data);
+  saveData(data);
+
+  const now=new Date();
+  document.getElementById("dateText").textContent = fmtDate(now);
+  document.getElementById("todayWorkout").textContent = PLAN[now.getDay()];
+
+  const weight=document.getElementById("weightInput");
+  weight.value = today.weight ?? "";
+
+  const btn=document.getElementById("toggleDone");
+  if(now.getDay()===6){
+    btn.textContent="Hviledag";
+    btn.disabled=true;
+    btn.className="secondary";
+  }else{
+    btn.disabled=false;
+    btn.textContent = today.workoutDone ? "✓ Trening registrert" : "✓ Marker trening som gjort";
+    btn.className = today.workoutDone ? "done" : "secondary";
+  }
+
+  const s=calculateStreaks(data);
+  document.getElementById("currentStreak").textContent=s.current;
+  document.getElementById("bestStreak").textContent=s.best;
+
+  const week=document.getElementById("weekPlan");
+  week.innerHTML="";
+  const order=[1,2,3,4,5,6,0];
+  order.forEach(d=>{
+    const el=document.createElement("div");
+    el.className="day";
+    el.innerHTML=`<b>${DAY_NAMES[d]}</b><span>${PLAN[d]}</span>`;
+    week.appendChild(el);
+  });
+
+  const history=document.getElementById("history");
+  const entries=Object.entries(data.days)
+    .filter(([k,v]) => v.workoutDone || v.weight !== null)
+    .sort((a,b)=>b[0].localeCompare(a[0]))
+    .slice(0,120);
+
+  if(entries.length===0){
+    history.innerHTML='<div class="empty">Ingen registreringer ennå.</div>';
+  } else {
+    history.innerHTML="";
+    for(const [k,v] of entries){
+      const d=parseKey(k);
+      const item=document.createElement("div");
+      item.className="item";
+      const badge = d.getDay()===6 ? '<span class="pill rest">Fri</span>' :
+        (v.workoutDone ? '<span class="pill ok">Gjort</span>' : '');
+      item.innerHTML=`
+        <div>${d.toLocaleDateString("nb-NO",{day:"2-digit",month:"2-digit",year:"2-digit"})}</div>
+        <div>
+          <div>${PLAN[d.getDay()]}</div>
+          <div class="status">${v.weight != null ? `${v.weight} kg` : "Ingen vekt"}</div>
+        </div>
+        <div>${badge}</div>`;
+      history.appendChild(item);
+    }
+  }
+}
+
+document.getElementById("saveWeight").addEventListener("click",()=>{
+  const val=document.getElementById("weightInput").value.trim();
+  const data=loadData(), today=ensureToday(data);
+  today.weight = val==="" ? null : Number(val);
+  saveData(data);
+  render();
+});
+
+document.getElementById("toggleDone").addEventListener("click",()=>{
+  const data=loadData(), today=ensureToday(data);
+  if(new Date().getDay()===6) return;
+  today.workoutDone = !today.workoutDone;
+  saveData(data);
+  render();
+});
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js"));
+}
+render();
+</script>
+</body>
+</html>
