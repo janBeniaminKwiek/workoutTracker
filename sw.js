@@ -1,4 +1,4 @@
-const CACHE="training-app-v1";
+const CACHE="training-app-v3";
 const FILES=["./","./index.html","./manifest.webmanifest","./icon.svg"];
 self.addEventListener("install",e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));

@@ -33,10 +33,15 @@
     .label{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
     .workout{font-size:25px;font-weight:750;margin:8px 0 16px;line-height:1.2}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    input[type="number"]{
-      width:150px; font-size:20px; border-radius:14px; border:1px solid var(--line);
+    input[type="number"], input[type="text"]{
+      font-size:20px; border-radius:14px; border:1px solid var(--line);
       background:#0b1222; color:var(--text); padding:12px 13px; outline:none;
     }
+    input[type="number"]{width:150px}
+    input[type="text"]{width:170px}
+    .exerciseBox{margin:0 0 14px}
+    .exerciseLabel{font-size:14px;color:var(--muted);margin-bottom:7px}
+    .unit{font-size:18px;font-weight:700;color:#dbeafe}
     input[type="number"]:focus{border-color:var(--accent2)}
     button{
       border:0; border-radius:14px; padding:12px 14px; font-size:16px; font-weight:700;
@@ -65,6 +70,27 @@
     .rest{background:#2a3144;color:#cbd5e1}
     .empty{color:var(--muted)}
     .foot{color:var(--muted);font-size:12px;margin-top:16px;line-height:1.4}
+
+    .tabs{display:flex;gap:8px;margin:0 0 14px}
+    .tabbtn{
+      flex:1;background:#101827;color:#cbd5e1;border:1px solid var(--line);
+      padding:12px;border-radius:14px
+    }
+    .tabbtn.active{background:#1d4f43;color:#d1fae5;border-color:#3f7666}
+    .tabpage{display:none}
+    .tabpage.active{display:block}
+    .chartCard{margin-bottom:14px}
+    .chartTitle{font-size:19px;font-weight:800;margin-bottom:4px}
+    .chartMeta{color:var(--muted);font-size:13px;margin-bottom:12px}
+    .chartWrap{width:100%;overflow:hidden}
+    svg.chart{width:100%;height:240px;display:block}
+    .chartGrid{stroke:#25324a;stroke-width:1}
+    .chartLine{fill:none;stroke:currentColor;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+    .chartPoint{fill:currentColor}
+    .chartText{fill:#94a3b8;font-size:11px}
+    .chartValue{fill:#e2e8f0;font-size:11px;font-weight:700}
+    .chartEmpty{color:var(--muted);padding:30px 4px;text-align:center}
+
     @media (min-width:650px){.grid.two{grid-template-columns:1.2fr .8fr}}
   </style>
 </head>
@@ -73,10 +99,25 @@
     <h1>Min trening</h1>
     <div class="sub" id="dateText"></div>
 
+    <div class="tabs">
+      <button class="tabbtn active" data-tab="todayPage">I dag</button>
+      <button class="tabbtn" data-tab="progressPage">Utvikling</button>
+    </div>
+
+    <div id="todayPage" class="tabpage active">
     <div class="grid two">
       <section class="card today">
         <div class="label">Dagens økt</div>
         <div class="workout" id="todayWorkout"></div>
+
+        <div class="exerciseBox" id="exerciseBox">
+          <div class="exerciseLabel" id="exerciseLabel"></div>
+          <div class="row">
+            <input id="exerciseInput" type="number" min="0" step="0.1" inputmode="decimal" />
+            <span class="unit" id="exerciseUnit"></span>
+            <button id="saveExercise">Lagre</button>
+          </div>
+        </div>
 
         <div class="row" style="margin-bottom:12px">
           <input id="weightInput" type="number" min="30" max="300" step="0.1" inputmode="decimal" placeholder="Vekt kg" />
@@ -115,6 +156,28 @@
       <div class="history" id="history" style="margin-top:8px"></div>
     </section>
 
+    </div>
+
+    <div id="progressPage" class="tabpage">
+      <section class="card chartCard">
+        <div class="chartTitle">Benkpress</div>
+        <div class="chartMeta" id="benchMeta">Utvikling over tid</div>
+        <div class="chartWrap" id="benchChart"></div>
+      </section>
+
+      <section class="card chartCard">
+        <div class="chartTitle">Markløft</div>
+        <div class="chartMeta" id="deadliftMeta">Utvikling over tid</div>
+        <div class="chartWrap" id="deadliftChart"></div>
+      </section>
+
+      <section class="card chartCard">
+        <div class="chartTitle">Knebøy</div>
+        <div class="chartMeta" id="squatMeta">Utvikling over tid</div>
+        <div class="chartWrap" id="squatChart"></div>
+      </section>
+    </div>
+
     <div class="foot">
       Alt lagres bare lokalt på denne enheten i nettleseren. Ingen konto og ingen opplasting.
     </div>
@@ -129,6 +192,15 @@ const PLAN = {
   5: "Bein",
   6: "Fri",
   0: "Skuldre / nakke + kondisjon (lang)"
+};
+const EXERCISE_FIELDS = {
+  1: {label:"Benkpress", unit:"kg"},
+  2: {label:"Intervaller", unit:"", text:true},
+  3: {label:"Markløft", unit:"kg"},
+  4: {label:"Kondisjon", unit:"km"},
+  5: {label:"Knebøy", unit:"kg"},
+  6: null,
+  0: {label:"Langtur", unit:"km"}
 };
 const DAY_NAMES = ["Søndag","Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag"];
 const KEY = "jan-training-app-v1";
@@ -151,7 +223,7 @@ function parseKey(k){
 }
 function ensureToday(data){
   const k=dateKey(), dow=new Date().getDay();
-  if(!data.days[k]) data.days[k] = {workoutDone:false, weight:null, workout:PLAN[dow], dayOfWeek:dow};
+  if(!data.days[k]) data.days[k] = {workoutDone:false, weight:null, exerciseValue:null, workout:PLAN[dow], dayOfWeek:dow};
   return data.days[k];
 }
 function isTrainingDay(d){ return d.getDay() !== 6; }
@@ -198,6 +270,69 @@ function calculateStreaks(data){
   return {current,best};
 }
 
+
+function getStrengthSeries(data, dow){
+  return Object.entries(data.days)
+    .filter(([k,v]) => parseKey(k).getDay() === dow && v.exerciseValue !== null && v.exerciseValue !== "" && !isNaN(Number(v.exerciseValue)))
+    .map(([k,v]) => ({date:k, value:Number(v.exerciseValue)}))
+    .sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function renderLineChart(containerId, metaId, points, unit){
+  const el=document.getElementById(containerId);
+  const meta=document.getElementById(metaId);
+  if(!points.length){
+    el.innerHTML='<div class="chartEmpty">Ingen registreringer ennå.</div>';
+    meta.textContent="Utvikling over tid";
+    return;
+  }
+
+  const latest=points[points.length-1];
+  const first=points[0];
+  const diff=latest.value-first.value;
+  meta.textContent=`Siste: ${latest.value} ${unit} · ${points.length} registrering${points.length===1?"":"er"}${points.length>1 ? ` · ${diff>=0?"+":""}${diff.toFixed(1)} ${unit} siden første` : ""}`;
+
+  const W=640,H=240, padL=46,padR=16,padT=18,padB=38;
+  const values=points.map(p=>p.value);
+  let min=Math.min(...values), max=Math.max(...values);
+  if(min===max){ min-=5; max+=5; }
+  const extra=(max-min)*0.12;
+  min=Math.max(0,min-extra); max=max+extra;
+  const x=i => points.length===1 ? (W+padL-padR)/2 : padL + i*(W-padL-padR)/(points.length-1);
+  const y=v => padT + (max-v)*(H-padT-padB)/(max-min);
+
+  let svg=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Utviklingsgraf">`;
+  for(let i=0;i<5;i++){
+    const yy=padT+i*(H-padT-padB)/4;
+    const val=max-i*(max-min)/4;
+    svg+=`<line class="chartGrid" x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}"/>`;
+    svg+=`<text class="chartText" x="${padL-7}" y="${yy+4}" text-anchor="end">${val.toFixed(0)}</text>`;
+  }
+  const pts=points.map((p,i)=>`${x(i)},${y(p.value)}`).join(" ");
+  if(points.length>1) svg+=`<polyline class="chartLine" points="${pts}" />`;
+  points.forEach((p,i)=>{
+    svg+=`<circle class="chartPoint" cx="${x(i)}" cy="${y(p.value)}" r="5"/>`;
+    if(points.length<=8 || i===0 || i===points.length-1){
+      svg+=`<text class="chartValue" x="${x(i)}" y="${Math.max(12,y(p.value)-10)}" text-anchor="middle">${p.value}</text>`;
+    }
+  });
+
+  const labelIndices = points.length<=5 ? points.map((_,i)=>i) : [0, Math.floor((points.length-1)/2), points.length-1];
+  [...new Set(labelIndices)].forEach(i=>{
+    const d=parseKey(points[i].date);
+    const lab=d.toLocaleDateString("nb-NO",{day:"2-digit",month:"2-digit"});
+    svg+=`<text class="chartText" x="${x(i)}" y="${H-12}" text-anchor="middle">${lab}</text>`;
+  });
+  svg+='</svg>';
+  el.innerHTML=svg;
+}
+
+function renderProgress(data){
+  renderLineChart("benchChart","benchMeta",getStrengthSeries(data,1),"kg");
+  renderLineChart("deadliftChart","deadliftMeta",getStrengthSeries(data,3),"kg");
+  renderLineChart("squatChart","squatMeta",getStrengthSeries(data,5),"kg");
+}
+
 function render(){
   const data=loadData();
   const today=ensureToday(data);
@@ -206,6 +341,23 @@ function render(){
   const now=new Date();
   document.getElementById("dateText").textContent = fmtDate(now);
   document.getElementById("todayWorkout").textContent = PLAN[now.getDay()];
+
+  const exerciseBox=document.getElementById("exerciseBox");
+  const exerciseInput=document.getElementById("exerciseInput");
+  const exerciseLabel=document.getElementById("exerciseLabel");
+  const exerciseUnit=document.getElementById("exerciseUnit");
+  const cfg=EXERCISE_FIELDS[now.getDay()];
+  if(cfg){
+    exerciseBox.style.display="block";
+    exerciseLabel.textContent=cfg.label;
+    exerciseUnit.textContent=cfg.unit;
+    exerciseInput.type = cfg.text ? "text" : "number";
+    exerciseInput.inputMode = cfg.text ? "text" : "decimal";
+    exerciseInput.placeholder = cfg.text ? "F.eks. 6 × 4 min" : cfg.label;
+    exerciseInput.value = today.exerciseValue ?? "";
+  } else {
+    exerciseBox.style.display="none";
+  }
 
   const weight=document.getElementById("weightInput");
   weight.value = today.weight ?? "";
@@ -255,13 +407,27 @@ function render(){
         <div>${d.toLocaleDateString("nb-NO",{day:"2-digit",month:"2-digit",year:"2-digit"})}</div>
         <div>
           <div>${PLAN[d.getDay()]}</div>
-          <div class="status">${v.weight != null ? `${v.weight} kg` : "Ingen vekt"}</div>
+          <div class="status">${
+            v.exerciseValue != null && v.exerciseValue !== ""
+              ? `${(EXERCISE_FIELDS[d.getDay()]?.label || "Økt")}: ${v.exerciseValue}${EXERCISE_FIELDS[d.getDay()]?.unit ? " " + EXERCISE_FIELDS[d.getDay()].unit : ""} · `
+              : ""
+          }${v.weight != null ? `${v.weight} kg kroppsvekt` : "Ingen vekt"}</div>
         </div>
         <div>${badge}</div>`;
       history.appendChild(item);
     }
   }
+
+  renderProgress(data);
 }
+
+document.getElementById("saveExercise").addEventListener("click",()=>{
+  const data=loadData(), today=ensureToday(data);
+  const input=document.getElementById("exerciseInput");
+  today.exerciseValue = input.value.trim();
+  saveData(data);
+  render();
+});
 
 document.getElementById("saveWeight").addEventListener("click",()=>{
   const val=document.getElementById("weightInput").value.trim();
@@ -277,6 +443,16 @@ document.getElementById("toggleDone").addEventListener("click",()=>{
   today.workoutDone = !today.workoutDone;
   saveData(data);
   render();
+});
+
+
+document.querySelectorAll(".tabbtn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tabpage").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  });
 });
 
 if("serviceWorker" in navigator){
