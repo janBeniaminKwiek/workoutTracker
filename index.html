@@ -214,9 +214,9 @@ const PLAN = {
   0: "Skuldre / nakke + kondisjon (lang)"
 };
 const EXERCISE_FIELDS = {
-  1: {label:"Benkpress", unit:"kg"},
+  1: {label:"Markløft", unit:"kg"},
   2: {label:"Intervaller", unit:"", text:true},
-  3: {label:"Markløft", unit:"kg"},
+  3: {label:"Benkpress", unit:"kg"},
   4: {label:"Kondisjon", unit:"km"},
   5: {label:"Knebøy", unit:"kg"},
   6: null,
@@ -356,8 +356,8 @@ function renderLineChart(containerId, metaId, points, unit){
 
 function renderProgress(data){
   renderLineChart("weightChart","weightMeta",getWeightSeries(data),"kg");
-  renderLineChart("benchChart","benchMeta",getStrengthSeries(data,1),"kg");
-  renderLineChart("deadliftChart","deadliftMeta",getStrengthSeries(data,3),"kg");
+  renderLineChart("benchChart","benchMeta",getStrengthSeries(data,3),"kg");
+  renderLineChart("deadliftChart","deadliftMeta",getStrengthSeries(data,1),"kg");
   renderLineChart("squatChart","squatMeta",getStrengthSeries(data,5),"kg");
 }
 
